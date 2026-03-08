@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pulse — Feel the Puzzle</title>
+  <meta name="description" content="A haptic-first puzzle game you can play with your eyes closed." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #0A0A0A;
+      --fg: #F2F2F2;
+      --mid: #7A7A7A;
+      --glass: rgba(255, 255, 255, 0.08);
+      --hairline: rgba(255, 255, 255, 0.12);
+      --glow: rgba(255, 255, 255, 0.04);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Space Grotesk', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Ripple background ── */
+    .ripple-bg {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+    }
+
+    .ripple-ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      animation: ripple-expand 8s ease-out infinite;
+    }
+
+    .ripple-ring:nth-child(1) { left: 20%; top: 15%; animation-delay: 0s; }
+    .ripple-ring:nth-child(2) { left: 70%; top: 40%; animation-delay: 2s; }
+    .ripple-ring:nth-child(3) { left: 40%; top: 70%; animation-delay: 4s; }
+    .ripple-ring:nth-child(4) { left: 80%; top: 80%; animation-delay: 6s; }
+    .ripple-ring:nth-child(5) { left: 10%; top: 50%; animation-delay: 1s; }
+
+    @keyframes ripple-expand {
+      0% { width: 0; height: 0; opacity: 0.5; transform: translate(-50%, -50%); }
+      100% { width: 600px; height: 600px; opacity: 0; transform: translate(-50%, -50%); }
+    }
+
+    /* ── Noise grain overlay ── */
+    .grain {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+      opacity: 0.03;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      background-size: 128px 128px;
+    }
+
+    /* ── Main content ── */
+    .content {
+      position: relative;
+      z-index: 2;
+    }
+
+    /* ── Nav ── */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      padding: 20px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      background: rgba(10, 10, 10, 0.7);
+      border-bottom: 1px solid var(--hairline);
+    }
+
+    .nav-brand {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: 1px;
+    }
+
+    .nav-links { display: flex; gap: 28px; }
+    .nav-links a {
+      color: var(--mid);
+      text-decoration: none;
+      font-size: 14px;
+      transition: color 0.3s;
+    }
+    .nav-links a:hover { color: var(--fg); }
+
+    /* ── Hero ── */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 120px 24px 80px;
+      text-align: center;
+    }
+
+    .video-container {
+      width: 100%;
+      max-width: 360px;
+      aspect-ratio: 9 / 16;
+      border-radius: 24px;
+      overflow: hidden;
+      border: 1px solid var(--hairline);
+      background: rgba(255, 255, 255, 0.03);
+      box-shadow: 0 0 80px rgba(255, 255, 255, 0.03), 0 0 160px rgba(255, 255, 255, 0.02);
+      position: relative;
+      cursor: pointer;
+    }
+
+    .video-container video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .video-play-btn {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(10, 10, 10, 0.4);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      transition: opacity 0.4s;
+    }
+
+    .video-play-btn.hidden { opacity: 0; pointer-events: none; }
+
+    .play-icon {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.3s, background 0.3s;
+    }
+
+    .play-icon:hover {
+      transform: scale(1.08);
+      background: rgba(255, 255, 255, 0.18);
+    }
+
+    .play-icon svg {
+      margin-left: 3px;
+    }
+
+    .hero-text {
+      margin-top: 48px;
+    }
+
+    .hero-title {
+      font-size: clamp(36px, 6vw, 56px);
+      font-weight: 600;
+      letter-spacing: -0.5px;
+      line-height: 1.1;
+      animation: fade-up 1s ease-out;
+    }
+
+    .hero-tagline {
+      margin-top: 16px;
+      font-size: clamp(16px, 2.5vw, 20px);
+      color: var(--mid);
+      font-weight: 400;
+      animation: fade-up 1s ease-out 0.2s both;
+    }
+
+    .hero-cta {
+      margin-top: 36px;
+      display: inline-block;
+      padding: 14px 36px;
+      border-radius: 100px;
+      background: var(--fg);
+      color: var(--bg);
+      font-size: 15px;
+      font-weight: 600;
+      text-decoration: none;
+      letter-spacing: 0.5px;
+      transition: transform 0.3s, box-shadow 0.3s;
+      animation: fade-up 1s ease-out 0.4s both;
+    }
+
+    .hero-cta:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px rgba(255, 255, 255, 0.1);
+    }
+
+    @keyframes fade-up {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Section base ── */
+    section {
+      padding: 120px 24px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .section-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      color: var(--mid);
+      margin-bottom: 24px;
+    }
+
+    .section-heading {
+      font-size: clamp(28px, 4vw, 40px);
+      font-weight: 600;
+      line-height: 1.2;
+      margin-bottom: 24px;
+    }
+
+    .section-body {
+      font-size: 17px;
+      line-height: 1.7;
+      color: var(--mid);
+    }
+
+    .section-body + .section-body { margin-top: 16px; }
+
+    /* ── Philosophy ── */
+    .philosophy {
+      text-align: center;
+      padding: 140px 24px;
+    }
+
+    .philosophy .quote {
+      font-size: clamp(24px, 4vw, 36px);
+      font-weight: 500;
+      line-height: 1.4;
+      font-style: italic;
+      opacity: 0.9;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .philosophy .quote-attr {
+      margin-top: 20px;
+      color: var(--mid);
+      font-size: 14px;
+    }
+
+    /* ── Features grid ── */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 20px;
+      margin-top: 48px;
+    }
+
+    .feature-card {
+      background: var(--glass);
+      border: 1px solid var(--hairline);
+      border-radius: 16px;
+      padding: 28px 24px;
+      transition: transform 0.3s, border-color 0.3s;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .feature-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.06);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 16px;
+      font-size: 18px;
+    }
+
+    .feature-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .feature-desc {
+      font-size: 14px;
+      color: var(--mid);
+      line-height: 1.5;
+    }
+
+    /* ── Moments section ── */
+    .moments-list {
+      margin-top: 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .moment-item {
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+      font-size: 17px;
+      color: var(--mid);
+    }
+
+    .moment-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--fg);
+      opacity: 0.4;
+      flex-shrink: 0;
+      margin-top: 8px;
+    }
+
+    /* ── Divider ── */
+    .divider {
+      max-width: 800px;
+      margin: 0 auto;
+      height: 1px;
+      background: var(--hairline);
+    }
+
+    /* ── Privacy ── */
+    .privacy {
+      padding: 80px 24px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .privacy h2 {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+
+    .privacy p {
+      font-size: 15px;
+      color: var(--mid);
+      line-height: 1.7;
+      margin-bottom: 12px;
+    }
+
+    .privacy p:last-child { margin-bottom: 0; }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center;
+      padding: 48px 24px;
+      border-top: 1px solid var(--hairline);
+    }
+
+    footer p {
+      font-size: 13px;
+      color: var(--mid);
+      opacity: 0.5;
+    }
+
+    /* ── Scroll reveal ── */
+    .reveal {
+      opacity: 0;
+      transform: translateY(30px);
+      transition: opacity 0.8s ease-out, transform 0.8s ease-out;
+    }
+
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 640px) {
+      nav { padding: 16px 20px; }
+      .nav-links { gap: 20px; }
+      .nav-links a { font-size: 13px; }
+      section { padding: 80px 20px; }
+      .philosophy { padding: 100px 20px; }
+      .video-container { max-width: 280px; }
+      .hero { padding: 100px 20px 60px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Ambient ripples -->
+  <div class="ripple-bg">
+    <div class="ripple-ring"></div>
+    <div class="ripple-ring"></div>
+    <div class="ripple-ring"></div>
+    <div class="ripple-ring"></div>
+    <div class="ripple-ring"></div>
+  </div>
+
+  <!-- Grain -->
+  <div class="grain"></div>
+
+  <!-- Content -->
+  <div class="content">
+
+    <nav>
+      <div class="nav-brand">Pulse</div>
+      <div class="nav-links">
+        <a href="#philosophy">Philosophy</a>
+        <a href="#features">Features</a>
+        <a href="#privacy">Privacy</a>
+      </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="hero">
+      <div class="video-container" id="videoContainer">
+        <video id="promoVideo" playsinline preload="metadata" poster="">
+          <source src="video/promo.mp4" type="video/mp4" />
+        </video>
+        <div class="video-play-btn" id="playBtn">
+          <div class="play-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <path d="M8 5.5L19 12L8 18.5V5.5Z" fill="#F2F2F2"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-text">
+        <h1 class="hero-title">Pulse</h1>
+        <p class="hero-tagline">A puzzle you feel.</p>
+        <a href="#" class="hero-cta">Download on the App Store</a>
+      </div>
+    </section>
+
+    <!-- Philosophy -->
+    <section class="philosophy reveal" id="philosophy">
+      <p class="quote">
+        "I don't want to look. I don't want to listen. I just want to feel."
+      </p>
+      <p class="quote-attr">The idea behind Pulse</p>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- About -->
+    <section class="reveal">
+      <p class="section-label">About</p>
+      <h2 class="section-heading">A game you play with your eyes closed.</h2>
+      <p class="section-body">
+        Pulse is a haptic-first puzzle game. No visuals required, no audio needed.
+        You feel numbers through vibrations, find the missing piece, and solve the puzzle
+        entirely through touch.
+      </p>
+      <p class="section-body">
+        Short levels. One hand. Zero screen time.
+      </p>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- When to play -->
+    <section class="reveal">
+      <p class="section-label">When to play</p>
+      <h2 class="section-heading">For the moments between moments.</h2>
+      <div class="moments-list">
+        <div class="moment-item">
+          <div class="moment-dot"></div>
+          <span>Can't sleep. Play without looking.</span>
+        </div>
+        <div class="moment-item">
+          <div class="moment-dot"></div>
+          <span>Mind won't stop. Clear your mind.</span>
+        </div>
+        <div class="moment-item">
+          <div class="moment-dot"></div>
+          <span>Waiting somewhere. Just feel.</span>
+        </div>
+        <div class="moment-item">
+          <div class="moment-dot"></div>
+          <span>Eyes tired from screens. Close them.</span>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- Features -->
+    <section class="reveal" id="features">
+      <p class="section-label">Features</p>
+      <h2 class="section-heading">Simple by design.</h2>
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F2F2F2" stroke-width="1.5">
+              <circle cx="12" cy="12" r="4"/>
+              <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2z" opacity="0.3"/>
+            </svg>
+          </div>
+          <div class="feature-title">Haptic Puzzles</div>
+          <div class="feature-desc">Feel numbers as vibration patterns. Each number has a unique pulse signature.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F2F2F2" stroke-width="1.5">
+              <path d="M4 12h16M12 4v16" opacity="0.6"/>
+              <rect x="6" y="6" width="12" height="12" rx="2" opacity="0.3"/>
+            </svg>
+          </div>
+          <div class="feature-title">5 Levels</div>
+          <div class="feature-desc">From simple lines to complex grids. The puzzles grow but the controls stay simple.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F2F2F2" stroke-width="1.5">
+              <path d="M12 3v18M3 12c0 5 4 9 9 9s9-4 9-9-4-9-9-9" opacity="0.4"/>
+              <circle cx="12" cy="12" r="2"/>
+            </svg>
+          </div>
+          <div class="feature-title">Zero Screen Time</div>
+          <div class="feature-desc">The screen is ambient. You never need to look at it to play or win.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F2F2F2" stroke-width="1.5">
+              <path d="M5 12c0-4 3-7 7-7s7 3 7 7" opacity="0.3"/>
+              <path d="M8 12c0-2.2 1.8-4 4-4s4 1.8 4 4" opacity="0.5"/>
+              <circle cx="12" cy="12" r="1.5"/>
+              <path d="M12 14v5"/>
+            </svg>
+          </div>
+          <div class="feature-title">One Hand</div>
+          <div class="feature-desc">Swipe and tap. That's it. Play while lying down, commuting, or resting.</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- Privacy -->
+    <section class="privacy reveal" id="privacy">
+      <h2>Privacy Policy</h2>
+      <p>
+        Pulse does not collect, store, or transmit any personal data. There are no accounts,
+        no analytics, no tracking, and no third-party services.
+      </p>
+      <p>
+        All game data (progress, settings, purchase status) is stored locally on your device
+        using AsyncStorage. Nothing leaves your phone.
+      </p>
+      <p>
+        In-app purchases are processed entirely by Apple through the App Store. We do not
+        have access to your payment information.
+      </p>
+      <p>
+        If you have questions, visit
+        <a href="https://pulse.coreup.me" style="color: var(--fg);">pulse.coreup.me</a>.
+      </p>
+      <p style="margin-top: 20px; font-size: 13px; opacity: 0.5;">
+        Last updated: March 2026
+      </p>
+    </section>
+
+    <footer>
+      <p>&copy; 2026 Pulse. All rights reserved.</p>
+    </footer>
+
+  </div>
+
+  <script>
+    // ── Video player ──
+    const video = document.getElementById('promoVideo');
+    const playBtn = document.getElementById('playBtn');
+    const container = document.getElementById('videoContainer');
+
+    container.addEventListener('click', () => {
+      if (video.paused) {
+        video.play();
+        playBtn.classList.add('hidden');
+      } else {
+        video.pause();
+        playBtn.classList.remove('hidden');
+      }
+    });
+
+    video.addEventListener('ended', () => {
+      playBtn.classList.remove('hidden');
+    });
+
+    // ── Scroll reveal ──
+    const reveals = document.querySelectorAll('.reveal');
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      });
+    }, { threshold: 0.15 });
+
+    reveals.forEach((el) => observer.observe(el));
+  </script>
+
+</body>
+</html>
