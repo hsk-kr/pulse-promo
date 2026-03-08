@@ -220,6 +220,65 @@
       margin-left: 3px;
     }
 
+    /* ── Video controls ── */
+    .video-controls {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      right: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-radius: 12px;
+      background: rgba(10, 10, 10, 0.6);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      opacity: 0;
+      transition: opacity 0.4s;
+      pointer-events: none;
+    }
+
+    .video-container:hover .video-controls,
+    .video-controls.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .video-controls.hidden { opacity: 0; pointer-events: none; }
+
+    .mute-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 2px;
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    .mute-btn svg { display: block; }
+
+    .volume-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 80px;
+      height: 3px;
+      background: rgba(255, 255, 255, 0.25);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .volume-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--fg);
+      cursor: pointer;
+    }
+
     .hero-text {
       margin-top: 48px;
     }
@@ -469,6 +528,7 @@
       section { padding: 80px 20px; }
       .philosophy { padding: 100px 20px; }
       .video-container { max-width: 280px; }
+      .video-controls { display: none; }
       .hero { padding: 100px 20px 60px; }
     }
   </style>
@@ -517,6 +577,16 @@
               <path d="M8 5.5L19 12L8 18.5V5.5Z" fill="#F2F2F2"/>
             </svg>
           </div>
+        </div>
+        <div class="video-controls" id="videoControls">
+          <button class="mute-btn" id="muteBtn" aria-label="Mute">
+            <svg id="volumeIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F2F2F2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M11 5L6 9H2v6h4l5 4V5z"/>
+              <path id="volumeWave1" d="M15.54 8.46a5 5 0 010 7.07"/>
+              <path id="volumeWave2" d="M19.07 4.93a10 10 0 010 14.14"/>
+            </svg>
+          </button>
+          <input type="range" class="volume-slider" id="volumeSlider" min="0" max="1" step="0.05" value="1" />
         </div>
       </div>
 
@@ -659,20 +729,78 @@
     const video = document.getElementById('promoVideo');
     const playBtn = document.getElementById('playBtn');
     const container = document.getElementById('videoContainer');
+    const controls = document.getElementById('videoControls');
+    const muteBtn = document.getElementById('muteBtn');
+    const volumeSlider = document.getElementById('volumeSlider');
+    const volumeWave1 = document.getElementById('volumeWave1');
+    const volumeWave2 = document.getElementById('volumeWave2');
+
+    let hideTimer;
+
+    function showControls() {
+      controls.classList.add('visible');
+      controls.classList.remove('hidden');
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => {
+        controls.classList.remove('visible');
+        controls.classList.add('hidden');
+      }, 2500);
+    }
+
+    container.addEventListener('mousemove', showControls);
+    container.addEventListener('mouseleave', () => {
+      clearTimeout(hideTimer);
+      controls.classList.remove('visible');
+      controls.classList.add('hidden');
+    });
+
+    // Prevent controls clicks from toggling play/pause
+    controls.addEventListener('click', (e) => e.stopPropagation());
 
     container.addEventListener('click', () => {
       if (video.paused) {
         video.play();
         playBtn.classList.add('hidden');
+        showControls();
       } else {
         video.pause();
         playBtn.classList.remove('hidden');
+        controls.classList.remove('visible');
+        controls.classList.add('hidden');
       }
     });
 
     video.addEventListener('ended', () => {
       playBtn.classList.remove('hidden');
+      controls.classList.remove('visible');
+      controls.classList.add('hidden');
     });
+
+    // Volume icon update
+    function updateVolumeIcon() {
+      const vol = video.volume;
+      const muted = video.muted;
+      volumeWave1.style.display = (muted || vol === 0) ? 'none' : '';
+      volumeWave2.style.display = (muted || vol < 0.5) ? 'none' : '';
+    }
+
+    muteBtn.addEventListener('click', () => {
+      video.muted = !video.muted;
+      if (!video.muted && video.volume === 0) {
+        video.volume = 0.5;
+        volumeSlider.value = 0.5;
+      }
+      volumeSlider.value = video.muted ? 0 : video.volume;
+      updateVolumeIcon();
+    });
+
+    volumeSlider.addEventListener('input', () => {
+      video.volume = volumeSlider.value;
+      video.muted = volumeSlider.value == 0;
+      updateVolumeIcon();
+    });
+
+    updateVolumeIcon();
 
     // ── Scroll reveal ──
     const reveals = document.querySelectorAll('.reveal');
