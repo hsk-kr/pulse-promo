@@ -106,6 +106,30 @@
     }
     .nav-links a:hover { color: var(--fg); }
 
+    /* ── Hamburger ── */
+    .nav-toggle {
+      display: none;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .nav-toggle span {
+      display: block;
+      width: 22px;
+      height: 2px;
+      background: var(--fg);
+      border-radius: 2px;
+      transition: transform 0.3s, opacity 0.3s;
+    }
+
+    .nav-toggle.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+    .nav-toggle.open span:nth-child(2) { opacity: 0; }
+    .nav-toggle.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
     /* ── Hero ── */
     .hero {
       min-height: 100vh;
@@ -398,8 +422,26 @@
     /* ── Responsive ── */
     @media (max-width: 640px) {
       nav { padding: 16px 20px; }
-      .nav-links { gap: 20px; }
-      .nav-links a { font-size: 13px; }
+      .nav-toggle { display: flex; }
+      .nav-links {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        flex-direction: column;
+        gap: 0;
+        background: rgba(10, 10, 10, 0.95);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-bottom: 1px solid var(--hairline);
+        padding: 8px 0;
+      }
+      .nav-links.open { display: flex; }
+      .nav-links a {
+        font-size: 15px;
+        padding: 14px 24px;
+      }
       section { padding: 80px 20px; }
       .philosophy { padding: 100px 20px; }
       .video-container { max-width: 280px; }
@@ -426,7 +468,12 @@
 
     <nav>
       <div class="nav-brand">Pulse</div>
-      <div class="nav-links">
+      <button class="nav-toggle" id="navToggle" aria-label="Menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <div class="nav-links" id="navLinks">
         <a href="#">Home</a>
         <a href="#philosophy">Philosophy</a>
         <a href="#features">Features</a>
@@ -568,6 +615,22 @@
   </div>
 
   <script>
+    // ── Mobile nav toggle ──
+    const navToggle = document.getElementById('navToggle');
+    const navLinks = document.getElementById('navLinks');
+
+    navToggle.addEventListener('click', () => {
+      navToggle.classList.toggle('open');
+      navLinks.classList.toggle('open');
+    });
+
+    navLinks.addEventListener('click', (e) => {
+      if (e.target.tagName === 'A') {
+        navToggle.classList.remove('open');
+        navLinks.classList.remove('open');
+      }
+    });
+
     // ── Video player ──
     const video = document.getElementById('promoVideo');
     const playBtn = document.getElementById('playBtn');
